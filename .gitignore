@@ -1,4 +1,5 @@
 .next
+drizzle
 node_modules
-next-env.d.ts
 .env
+next-env.d.ts
