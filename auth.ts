@@ -7,7 +7,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(postgres),
   providers: [
     Resend({
-      from: "daniel@mail.danielbacsur.dev",
+      from: "daniel@resend.danielbacsur.com",
     }),
   ],
 });
