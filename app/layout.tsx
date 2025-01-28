@@ -1,3 +1,4 @@
+import { SessionProvider } from "next-auth/react";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -12,8 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="antialiased">{children}</body>
-    </html>
+    <SessionProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className="antialiased">{children}</body>
+      </html>
+    </SessionProvider>
   );
 }
