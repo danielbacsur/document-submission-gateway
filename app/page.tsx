@@ -1,101 +1,238 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useCallback } from "react";
+import { useForm, FormProvider } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { z } from "zod";
+import {
+  emailSchema,
+  emailVerificationSchema,
+  phoneSchema,
+  phoneVerificationSchema,
+  accountDetailsSchema,
+  bankDetailsSchema,
+  agreementSchema,
+  uploadSchema,
+  type formSchema,
+} from "@/schemas/form";
+import EmailStep from "@/components/email-step";
+import EmailVerificationStep from "@/components/email-verification-step";
+import PhoneStep from "@/components/phone-step";
+import PhoneVerificationStep from "@/components/phone-verification-step";
+import AccountDetailsStep from "@/components/account-details-step";
+import BankDetailsStep from "@/components/bank-details-step";
+import AgreementStep from "@/components/agreement-step";
+import UploadStep from "@/components/upload-step";
+import { sendMagicLink, submitResults } from "@/lib/actions";
+import { useSession } from "next-auth/react";
+
+type FormData = z.infer<typeof formSchema>;
+
+const steps = [
+  { name: "Email", component: EmailStep, schema: emailSchema },
+  {
+    name: "Email Verification",
+    component: EmailVerificationStep,
+    schema: emailVerificationSchema,
+  },
+  { name: "Phone", component: PhoneStep, schema: phoneSchema },
+  {
+    name: "Phone Verification",
+    component: PhoneVerificationStep,
+    schema: phoneVerificationSchema,
+  },
+  {
+    name: "Account Details",
+    component: AccountDetailsStep,
+    schema: accountDetailsSchema,
+  },
+  {
+    name: "Bank Details",
+    component: BankDetailsStep,
+    schema: bankDetailsSchema,
+  },
+  { name: "Agreement", component: AgreementStep, schema: agreementSchema },
+  { name: "Upload", component: UploadStep, schema: uploadSchema },
+];
+
+export default function MultiStepForm() {
+  const [currentStep, setCurrentStep] = useState(0);
+  const session = useSession();
+  const methods = useForm<FormData>({
+    resolver: zodResolver(steps[currentStep].schema),
+    mode: "onChange",
+    defaultValues: {
+      email: { email: "", verified: false },
+      phone: { phone: "", verified: false },
+      accountDetails: {
+        type: "personal",
+        firstName: "",
+        lastName: "",
+        businessName: "",
+        businessType: "",
+      },
+      bankDetails: {
+        isOwnAccount: "true",
+        iban: "",
+        accountHolder: "",
+        taxCode: "",
+      },
+      agreement: {
+        envelopeId: "",
+        signed: false,
+      },
+      upload: { file: "" },
+    },
+  });
+
+  const { watch } = methods;
+
+  const formData = watch();
+
+  const canNavigateToStep = useCallback(
+    (step: number) => {
+      if (step === 0) return true;
+      const prevStepSchema = steps[step - 1].schema;
+      try {
+        prevStepSchema.parse(formData);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    },
+    [formData]
+  );
+
+  const isStepValid = useCallback(
+    (step: number) => {
+      if (step < 0) return true;
+      const stepSchema = steps[step].schema;
+      try {
+        stepSchema.parse(formData);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    },
+    [formData]
+  );
+
+  const onSubmit = async (data: FormData) => {
+    if (currentStep === 0 && data.email.email !== session.data?.user?.email) {
+      await sendMagicLink(data.email.email);
+      setCurrentStep(currentStep + 1);
+    } else if (currentStep === 2 && !data.phone?.verified) {
+      console.log("Sending phone verification code:", data.phone.phone);
+      setCurrentStep(currentStep + 1);
+    } else if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      console.log("Submitting form data:", data);
+      submitResults(data);
+    }
+  };
+
+  const CurrentStepComponent = steps[currentStep].component;
+
+  const goToPreviousStep = useCallback(() => {
+    if (currentStep > 0) {
+      const newStep = currentStep - 1;
+      setCurrentStep(newStep);
+
+      if (newStep === 0) {
+        methods.setValue("email.verified", false);
+      } else if (newStep === 2) {
+        methods.setValue("phone.verified", false);
+      }
+    }
+  }, [currentStep, methods]);
+
+  // Calculate the width of a single section
+  const sectionWidth = 100 / steps.length;
+
+  // Calculate the start position and width of the progress line
+  const lineStart = sectionWidth / 2;
+  const lineWidth = 100 - sectionWidth;
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <FormProvider
+      {...methods}
+      // @ts-expect-error
+      goToPreviousStep={goToPreviousStep}
+    >
+      <div className="max-w-4xl mx-auto mt-8 p-4 bg-white shadow-md rounded-lg">
+        <div className="relative flex justify-between mb-16">
+          <div
+            className="absolute top-4 h-1 bg-gray-200"
+            style={{
+              left: `${lineStart}%`,
+              width: `${lineWidth}%`,
+            }}
+          ></div>
+          <div
+            className="absolute top-4 h-1 bg-blue-500 transition-all duration-300 ease-in-out"
+            style={{
+              left: `${lineStart}%`,
+              width: `${(currentStep / (steps.length - 1)) * lineWidth}%`,
+            }}
+          ></div>
+          {steps.map((step, index) => (
+            <div
+              key={step.name}
+              className="flex flex-col items-center"
+              style={{ width: `${sectionWidth}%` }}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  canNavigateToStep(index)
+                    ? index <= currentStep
+                      ? "bg-blue-500 text-white cursor-pointer"
+                      : "bg-gray-200 text-gray-600 cursor-pointer"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                } relative z-10`}
+                onClick={() =>
+                  canNavigateToStep(index) &&
+                  isStepValid(index - 1) &&
+                  setCurrentStep(index)
+                }
+              >
+                {index + 1}
+              </div>
+              <span
+                className={`text-xs mt-2 text-center ${
+                  canNavigateToStep(index)
+                    ? "cursor-pointer"
+                    : "cursor-not-allowed text-gray-500"
+                }`}
+                onClick={() =>
+                  canNavigateToStep(index) &&
+                  isStepValid(index - 1) &&
+                  setCurrentStep(index)
+                }
+              >
+                {step.name}
+              </span>
+            </div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        <form onSubmit={methods.handleSubmit(onSubmit)} className="mt-8">
+          <CurrentStepComponent />
+          <div className="mt-4 flex justify-end">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              {currentStep === steps.length - 1 ? "Submit" : "Next"}
+            </button>
+          </div>
+        </form>
+      </div>
+      <pre className="mt-8 p-4 bg-gray-100 rounded-lg overflow-auto max-h-64">
+        {JSON.stringify(methods.watch(), null, 2)}
+      </pre>
+      <pre className="mt-8 p-4 bg-gray-100 rounded-lg overflow-auto max-h-64">
+        {JSON.stringify(session, null, 2)}
+      </pre>
+    </FormProvider>
   );
 }
