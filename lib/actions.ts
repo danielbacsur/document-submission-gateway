@@ -2,6 +2,7 @@
 
 import { signIn } from "@/auth";
 import { formSchema } from "@/schemas/form";
+import { redirect } from "next/navigation";
 import twilio from "twilio";
 import { z } from "zod";
 
@@ -40,8 +41,8 @@ export async function sendPhoneVerificationCode(phone: string) {
   return code;
 }
 
-
 export async function submitResults(data: FormData) {
   console.log("Submitting results", data);
+  redirect("/thanks");
   return true;
 }
