@@ -24,7 +24,7 @@ import BankDetailsStep from "@/components/bank-details-step";
 import AgreementStep from "@/components/agreement-step";
 import UploadStep from "@/components/upload-step";
 import { sendMagicLink, submitResults } from "@/lib/actions";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -140,6 +140,7 @@ export default function MultiStepForm() {
       setCurrentStep(newStep);
 
       if (newStep === 0) {
+        signOut();
         methods.setValue("email.verified", false);
       } else if (newStep === 2) {
         methods.setValue("phone.verified", false);
